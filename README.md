@@ -604,6 +604,7 @@ The author acknowledges the foundational contributions of:
 * **Peter Shor** for demonstrating the impact of quantum computation on classical cryptography;
 * **Daniel J. Bernstein** for cryptographic engineering; and
 * the **NIST Post-Quantum Cryptography Project** for the standardisation of post-quantum cryptographic primitives.
+* **Ethan Heilman**, **Hunter Beast**, and **Isabel Foxen Duke** for their work on BIP-360.
 
 Acknowledgement is also due to contributors to the Bitcoin protocol and BIP process whose work on execution-time exposure, mempool policy, and conservative hardening helped clarify scope, terminology, and design discipline.
 
