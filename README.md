@@ -169,14 +169,21 @@ PQEH defines execution hardening only. PQEH does not define operational behaviou
 
 ## 5A. Explicit Dependencies
 
+Implementations claiming PQEH conformance MUST meet the minimum versions below:
+
 | Specification | Minimum Version | Purpose |
 |---------------|-----------------|---------|
-| PQSEC | ≥ 2.0.1 | Enforcement approval before S2 revelation |
-| PQHD | ≥ 1.1.0 | Custody predicate satisfaction |
+| Epoch Clock | ≥ 2.0.0 | Verifiable execution timing and ordering |
+| PQSF | ≥ 2.0.2 | Canonical encoding and cryptographic profiles |
+| PQSEC | ≥ 2.0.1 | Enforcement approval prior to S2 revelation |
+| PQHD | ≥ 1.1.0 | Custody predicate definition |
 | ZET/ZEB | ≥ 1.2.0 | Execution boundary and broadcast discipline |
-| Epoch Clock | ≥ 2.1.1 | Tick-based execution timing |
+| PQVL | ≥ 1.0.3 | Runtime integrity evidence (when required by policy) |
 
-PQEH defines execution patterns only. Custody authority is defined by PQHD and enforced by PQSEC.
+Implementations MAY evaluate using earlier versions, but MUST NOT claim conformance while below the stated minimums.
+
+PQEH defines execution patterns only.  
+Custody authority is defined by PQHD and enforced by PQSEC.
 
 ---
 
@@ -220,36 +227,69 @@ PQEH mitigates quantum pre-construction via:
 
 The S1/S2 revelation pattern provides **denial of pre-construction**:
 
-1. **S1 (Secret 1)**: High-entropy secret held by authorizer, never revealed until execution
+1. **S1 (Secret 1)**: High-entropy secret held by the authorizer, never revealed until execution
 2. **S2 (Secret 2)**: Derived from S1, embedded in script commitment
 3. **Execution Gate**: Transaction cannot be constructed without S1
 4. **Revelation**: S1 revealed only at execution time, enabling atomic broadcast
+
+---
 
 ### 8.2 S1 Generation
 
 ```python
 S1 = CSPRNG(256 bits)
-```
+````
 
 Requirements:
-* S1 MUST be generated from cryptographically secure random number generator
-* S1 MUST have at least 256 bits of entropy
-* S1 MUST be unique per transaction attempt
-* S1 MUST be stored securely until revelation time
 
-### 8.3 S2 Derivation
+* S1 MUST be generated from a cryptographically secure random number generator.
+* S1 MUST have at least 256 bits of entropy.
+* S1 MUST be unique per transaction attempt.
+* S1 MUST be stored securely until revelation time.
+
+---
+
+### 8.3 S1 Storage Requirements
+
+S1 MUST be treated as attempt-scoped secret material.
+
+**Requirements:**
+
+* MUST NOT be logged, transmitted, or persisted outside the originating security domain.
+* MUST be stored only for the minimum duration required to complete the authorised attempt.
+* MUST be zeroed immediately after use, and any attempt-scoped buffers MUST be cleared deterministically.
+* Platforms with a hardware-backed secure store (Secure Element, TEE, HSM, OS-provided protected key store) SHOULD use it to protect S1 at rest prior to revelation.
+* If hardware-backed secure storage is unavailable:
+
+  * S1 MUST be kept only in process memory,
+  * memory pages containing S1 SHOULD be locked to reduce swapping where the platform supports it,
+  * and S1 MUST NOT be written to disk-backed storage.
+
+**Release gate:**
+
+* Implementations claiming PQEH execution hardening MUST NOT reveal S1 unless required upstream predicates are satisfied, including valid runtime evidence when policy requires it (for example `PQVL drift_class == NONE`).
+
+This specification defines S1 handling requirements only.
+Enforcement is performed by **PQSEC**.
+
+---
+
+### 8.4 S2 Derivation
 
 ```python
 S2 = SHA256(S1)
 ```
 
 Requirements:
-* S2 MUST be derived deterministically from S1
-* S2 MUST be embedded in script template before authorization
-* S2 serves as commitment to S1
-* Pre-image resistance prevents S1 derivation from S2
 
-### 8.4 Script Template with S2 Commitment
+* S2 MUST be derived deterministically from S1.
+* S2 MUST be embedded in the script template before authorization.
+* S2 serves as a commitment to S1.
+* Pre-image resistance MUST prevent derivation of S1 from S2.
+
+---
+
+### 8.5 Script Template with S2 Commitment
 
 ```
 OP_SHA256 <S2> OP_EQUALVERIFY
@@ -257,31 +297,37 @@ OP_SHA256 <S2> OP_EQUALVERIFY
 ```
 
 This script requires:
-1. Witness provides S1
-2. SHA256(S1) == S2
-3. Valid signature over spending transaction
+
+1. The witness provides S1.
+2. `SHA256(S1) == S2`.
+3. A valid signature over the spending transaction.
 
 Without S1, the transaction cannot be constructed.
 
-### 8.5 Revelation Timing
+---
 
-**Critical Timing Requirements:**
+### 8.6 Revelation Timing
 
-1. S1 MUST NOT be revealed before PQSEC authorization
-2. S1 MUST NOT be revealed before ready to broadcast
-3. S1 revelation and transaction broadcast MUST occur atomically
-4. Time between S1 revelation and broadcast MUST be minimized (target: < 1 second)
+**Critical timing requirements:**
 
-### 8.6 Revelation Protocol
+1. S1 MUST NOT be revealed before PQSEC authorization.
+2. S1 MUST NOT be revealed before the system is ready to broadcast.
+3. S1 revelation and transaction broadcast MUST occur atomically.
+4. The time between S1 revelation and broadcast MUST be minimized
+   (target: less than 1 second).
 
-```
+---
+
+### 8.7 Revelation Protocol
+
+
 1. Custody authorization obtained (PQSEC + PQHD)
-2. Transaction template prepared (with S2 in script)
-3. S1 revealed to transaction construction component
-4. Transaction constructed with S1 in witness
+2. Transaction template prepared (with S2 embedded in script)
+3. S1 revealed to the transaction construction component
+4. Transaction constructed with S1 in the witness
 5. Transaction signed with custody keys
 6. Transaction broadcast immediately via ZEB
-```
+
 
 ---
 
